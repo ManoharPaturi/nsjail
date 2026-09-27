@@ -39,14 +39,15 @@ jobs:
         run: make kafel/libkafel.a
       - name: asan+ubsan build
         run: |
-          export PBLIBS=$(pkg-config --libs protobuf)
-          export NLLIBS=$(pkg-config --libs libnl-route-3.0 || echo "-lnl-route-3 -lnl-3")
-          make -j"$(nproc)" CC=clang CXX=clang++ \
-            USER_DEFINES='-fsanitize=address,undefined -fno-omit-frame-pointer -O1 -g' \
-            LDFLAGS="-pie -Wl,-z,noexecstack -fsanitize=address,undefined -lpthread $PBLIBS $NLLIBS"
-      - name: unit tests under sanitizers
+          echo "export PBLIBS=$(pkg-config --libs protobuf)" >> /tmp/env
+          echo "export NLLIBS=$(pkg-config --libs libnl-route-3.0 || echo '-lnl-route-3 -lnl-3')" >> /tmp/env
+          echo "export SAN_USER_DEFINES='-fsanitize=address,undefined -fno-omit-frame-pointer -O1 -g'" >> /tmp/env
+          echo "export SAN_LDFLAGS="-pie -Wl,-z,noexecstack -fsanitize=address,undefined -lpthread \$(pkg-config --libs protobuf) \$(pkg-config --libs libnl-route-3.0 || echo '-lnl-route-3 -lnl-3')"" >> /tmp/env
+      - name: asan+ubsan build and tests
         run: |
+          . /tmp/env
+          make -j"$(nproc)" CC=clang CXX=clang++ USER_DEFINES="$SAN_USER_DEFINES" LDFLAGS="$SAN_LDFLAGS"
           sudo -E env ASAN_OPTIONS=detect_leaks=0:abort_on_error=0 UBSAN_OPTIONS=print_stacktrace=1 \
-            make test 2>&1 | tee /tmp/asan.log || true
+            make test CC=clang CXX=clang++ USER_DEFINES="$SAN_USER_DEFINES" LDFLAGS="$SAN_LDFLAGS" 2>&1 | tee /tmp/asan.log || true
           echo "=== SANITIZER FINDINGS ==="
           grep -E "ERROR: AddressSanitizer|runtime error:|SUMMARY:" /tmp/asan.log || echo "none"
