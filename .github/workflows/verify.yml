@@ -13,13 +13,48 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch }}
+          submodules: recursive
       - name: deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ pkg-config libprotobuf-dev protobuf-compiler libnl-route-3-dev libtool autoconf
+          sudo apt-get install -y g++ pkg-config libprotobuf-dev protobuf-compiler libnl-route-3-dev
       - name: build
         run: make -j"$(nproc)"
       - name: unit tests
-        run: make test 2>&1 || true
+        run: make test
       - name: cmdline tests
         run: make test-cmdline
+  sanitize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          submodules: recursive
+      - name: deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang pkg-config libprotobuf-dev protobuf-compiler libnl-route-3-dev
+      - name: asan+ubsan build
+        run: |
+          make clean 2>/dev/null || true
+          make -j"$(nproc)" CC=clang CXX=clang++ \
+            USER_DEFINES='-fsanitize=address,undefined -fno-omit-frame-pointer -O1 -g' \
+            LDFLAGS_EXTRA='-fsanitize=address,undefined' 2>&1 | tail -40 || make -j"$(nproc)" CC=clang CXX=clang++ USER_DEFINES='-fsanitize=address,undefined -fno-omit-frame-pointer -O1 -g'
+      - name: run unit tests under sanitizers
+        run: make test 2>&1 | tail -60
+      - name: run cmdline tests under sanitizers
+        run: make test-cmdline 2>&1 | tail -40
+  cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          submodules: recursive
+      - name: cppcheck
+        run: |
+          sudo apt-get update && sudo apt-get install -y cppcheck
+          cppcheck --enable=warning,portability,performance --inline-suppr --error-exitcode=0 \
+            -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 --std=c++20 -Ikafel/include -I. \
+            --suppress='*:kafel/*' *.cc nstun/*.cc unotify/*.cc 2>&1 | grep -v '^ *\*' | head -120
