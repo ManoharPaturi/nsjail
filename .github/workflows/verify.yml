@@ -17,7 +17,7 @@ jobs:
       - name: deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ pkg-config libprotobuf-dev protobuf-compiler libnl-route-3-dev strace setpriv
+          sudo apt-get install -y g++ pkg-config libprotobuf-dev protobuf-compiler libnl-route-3-dev strace
       - name: build
         run: make -j"$(nproc)"
       - name: tests (informational, env-dependent cases expected)
@@ -34,7 +34,7 @@ jobs:
       - name: deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang pkg-config libprotobuf-dev protobuf-compiler libnl-route-3-dev strace setpriv
+          sudo apt-get install -y clang pkg-config libprotobuf-dev protobuf-compiler libnl-route-3-dev strace
       - name: build kafel with default flags
         run: make kafel/libkafel.a
       - name: asan+ubsan build
